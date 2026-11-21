@@ -221,7 +221,7 @@ export function initUI(app) {
         cut.setAttribute('aria-pressed', e.cut);
         cut.setAttribute('aria-label', `"${e.name}"抠掉背景`);
         cut.addEventListener('click', () => app.toggleCut(e.id));
-        li.append(cut);
+        secs.before(cut); // 放在名称和秒数之间，各行的秒数才对得齐
       }
       if (e.removable) {
         const del = document.createElement('button');

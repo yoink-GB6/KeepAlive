@@ -24,10 +24,8 @@
 <p id="fatal" hidden>这台设备的浏览器无法启用 3D 渲染（WebGL），请换一个浏览器试试。</p>
 
 <aside id="panel" hidden>
-  <header>
-    <h1>全息棱锥</h1>
-    <button id="closeBtn" class="primary">收起</button>
-  </header>
+  <div id="panelBody">
+  <p class="note lead">屏幕亮度调到最高、环境调暗，效果最好。</p>
 
   <section>
     <h2>内容</h2>
@@ -67,12 +65,12 @@
     <p class="note">背景音乐用上面的"导入"按钮添加，只保留一首，循环播放。单独播放视频时出视频的声音，音乐暂停；相册里的视频不出声。</p>
   </section>
 
-  <section>
-    <h2>设备</h2>
+  <p id="iosTip" class="note" hidden>iPhone 请在 Safari 里点"分享 → 添加到主屏幕"，再从主屏幕图标打开，就能全屏。</p>
+  </div>
+  <footer id="panelBar">
     <button id="fullscreenBtn">全屏 / 退出全屏</button>
-    <p id="iosTip" class="note" hidden>iPhone 请在 Safari 里点"分享 → 添加到主屏幕"，再从主屏幕图标打开，就能全屏。</p>
-    <p class="note">把屏幕亮度调到最高、关灯，效果最好。</p>
-  </section>
+    <button id="closeBtn" class="primary">收起</button>
+  </footer>
 </aside>
 
 <div id="wizard" role="dialog" aria-labelledby="wizStep" hidden>
