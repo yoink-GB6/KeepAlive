@@ -14,11 +14,12 @@ import { kindOf, itemScene, fileModelScene, albumScene, audioPlayer } from './im
 import { initUI } from './ui.js';
 
 // 随应用发布的模型，加一行就多一个。id 会存进设置里，定了就别改。
-// 可选的微调（rotate、scale、hide、glow、gamma）见 importers.js 的 modelScene
+// 可选的微调（rotate、scale、hide、glow、color、gamma）见 importers.js 的 modelScene
 const MODELS = [
   { id: 'model:butterfly', name: '蝴蝶', file: 'glbs/fantasy_butterfly_animation.glb', rotate: [-70, 0, 0], scale: 1.35, hide: /Tail|T1/, glow: 0.5 },
   { id: 'model:bangboo', name: '邦布', file: 'glbs/bangboo_01_-_eous.glb', scale: 1.15, hide: /stool/, gamma: 0.7 },
   { id: 'model:dolphin', name: '海豚', file: 'glbs/low_poly_dolphin.glb', rotate: [0, 90, 0], scale: 1.2 },
+  { id: 'model:finger', name: '中指', file: 'glbs/test_middle_finger.glb', rotate: [0, 90, 0], scale: 1.13, color: 0xd9a27e },
 ];
 
 const BUILTINS = [

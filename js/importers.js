@@ -84,6 +84,7 @@ function poseBox(root) {
 //   hide     名字匹配这个正则的网格不显示，也不参与适配；匹配的骨骼缩成一个点，它带动的那部分跟着消失
 //   glow     贴图是黑底发光图案的模型：不受光照，颜色贴图和自发光贴图合在一起叠加绘制，黑的地方就是透明。
 //            值是亮度，层层相叠太白就调低
+//   color    覆盖材质的底色（纯白的模型打上光会糊成一片，看不出起伏）
 //   gamma    小于 1 时把颜色的暗部提亮（棱锥里深色几乎看不见），亮部基本不变
 async function modelScene(blob, tune = {}) {
   let gltf;
@@ -106,6 +107,7 @@ async function modelScene(blob, tune = {}) {
       if (!glows.has(o.material)) glows.set(o.material, glowMaterial(o.material, tune.glow));
       o.material = glows.get(o.material);
     }
+    if (tune.color !== undefined) o.material.color.set(tune.color);
     if (tune.gamma) liftShadows(o.material, tune.gamma);
     if (!o.isSkinnedMesh) return;
     skinned += o.geometry.attributes.position.count;

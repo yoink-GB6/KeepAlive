@@ -1,5 +1,5 @@
 // 离线缓存。联网时优先取最新文件（方便更新），3 秒内取不到或断网时用缓存。
-const CACHE = 'holo-v4';
+const CACHE = 'holo-v5';
 const ASSETS = [
   './',
   'index.html',
@@ -32,6 +32,7 @@ const ASSETS = [
   'glbs/fantasy_butterfly_animation.glb',
   'glbs/bangboo_01_-_eous.glb',
   'glbs/low_poly_dolphin.glb',
+  'glbs/test_middle_finger.glb',
 ];
 
 self.addEventListener('install', (e) => {
