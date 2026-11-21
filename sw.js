@@ -1,5 +1,5 @@
 // 离线缓存。联网时优先取最新文件（方便更新），3 秒内取不到或断网时用缓存。
-const CACHE = 'holo-v5';
+const CACHE = 'holo-v6';
 const ASSETS = [
   './',
   'index.html',
@@ -13,6 +13,8 @@ const ASSETS = [
   'js/store.js',
   'js/ui.js',
   'js/importers.js',
+  'js/cutout.js',
+  'js/cutout-worker.js',
   'js/scenes/util.js',
   'js/scenes/jellyfish.js',
   'js/scenes/fireworks.js',
@@ -29,6 +31,9 @@ const ASSETS = [
   'vendor/three/libs/draco/gltf/draco_decoder.js',
   'vendor/three/libs/draco/gltf/draco_decoder.wasm',
   'vendor/three/libs/draco/gltf/draco_wasm_wrapper.js',
+  'vendor/onnxruntime-web/ort.wasm.min.js',
+  'vendor/onnxruntime-web/ort-wasm-simd.wasm',
+  'vendor/u2netp/u2netp.onnx',
   'glbs/fantasy_butterfly_animation.glb',
   'glbs/bangboo_01_-_eous.glb',
   'glbs/low_poly_dolphin.glb',

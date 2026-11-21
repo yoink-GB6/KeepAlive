@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { QuadView } from './quadview.js';
-import { loadSettings, saveSettings, listItems, addItem, deleteItem } from './store.js';
+import { loadSettings, saveSettings, listItems, addItem, updateItem, deleteItem } from './store.js';
 import { disposeObject } from './scenes/util.js';
 import jellyfish from './scenes/jellyfish.js';
 import fireworks from './scenes/fireworks.js';
@@ -11,6 +11,7 @@ import globe from './scenes/globe.js';
 import textring from './scenes/textring.js';
 import calib from './scenes/calib.js';
 import { kindOf, itemScene, fileModelScene, albumScene, audioPlayer } from './importers.js';
+import { cutout } from './cutout.js';
 import { initUI } from './ui.js';
 
 // 随应用发布的模型，加一行就多一个。id 会存进设置里，定了就别改。
@@ -79,7 +80,9 @@ function entries() {
   const list = BUILTINS.map((b) => ({ id: b.id, name: b.name }));
   if (items.filter(isMedia).length >= 2) list.push({ id: 'album', name: '旋转相册（全部照片和视频）' });
   for (const it of items) {
-    list.push({ id: `item:${it.id}`, name: `${KIND_LABEL[it.kind]}：${it.name}`, removable: true });
+    const e = { id: `item:${it.id}`, name: `${KIND_LABEL[it.kind]}：${it.name}`, removable: true };
+    if (it.cut) e.cut = !it.plain; // 抠过图的照片可以在抠图和原图之间切换
+    list.push(e);
   }
   return list;
 }
@@ -252,6 +255,17 @@ const app = {
         ui.toast(`${file.name}：${e.message || e}`);
         continue;
       }
+      if (kind === 'image' && settings.cutout) {
+        // 原图照样保存，抠好的图另存一份；抠不成就只有原图，导入不受影响
+        try {
+          draft.cut = await cutout(file, (stage) => {
+            ui.progress(stage === 'load' ? '正在准备抠图（第一次要载入模型，请稍等）…' : `正在抠图：${draft.name}…`);
+          });
+        } catch (e) {
+          ui.toast(`${file.name}：抠图没成功（${e.message || e}），已按原图导入`);
+        }
+        ui.progress(null);
+      }
       const it = await addItem(draft);
       unsaved ||= !it.persisted;
       items.push(it);
@@ -269,6 +283,15 @@ const app = {
     old.player?.dispose();
     await deleteItem(old.item.id);
     ui.refresh();
+  },
+  async toggleCut(id) {
+    const it = items.find((i) => `item:${i.id}` === id);
+    if (!it?.cut) return;
+    it.plain = !it.plain;
+    await updateItem(it);
+    // 正在显示的要重建；校准画面开着时不打断它，退出校准时自然会重建
+    if (!settings.calib && (settings.current === id || settings.current === 'album')) show(settings.current);
+    else ui.refresh();
   },
   async remove(id) {
     const it = items.find((i) => `item:${i.id}` === id);

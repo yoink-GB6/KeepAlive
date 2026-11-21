@@ -1,0 +1,5 @@
+U²-Net 的轻量版 u2netp（显著性目标分割，用来抠图），ONNX 格式，未做修改。
+作者：Xuebin Qin 等，"U2-Net: Going Deeper with Nested U-Structure for Salient Object Detection"，Pattern Recognition 2020
+原仓库：https://github.com/xuebinqin/U-2-Net （Apache License 2.0，见同目录 LICENSE；权重由该仓库的 README 提供下载）
+ONNX 文件来源：https://github.com/danielgatis/rembg/releases/download/v0.0.0/u2netp.onnx （rembg 项目转换，rembg 本身为 MIT 许可）
+  u2netp.onnx   sha256 309c8469258dda742793dce0ebea8e6dd393174f89934733ecc8b14c76f4ddd8

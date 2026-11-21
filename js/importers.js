@@ -208,7 +208,10 @@ async function videoTexture(blob) {
   };
 }
 
-const mediaTexture = (item) => (item.kind === 'video' ? videoTexture(item.blob) : imageTexture(item.blob));
+// 抠过图的照片同时存着原图（blob）和抠好的图（cut），plain 为真表示用户选了看原图
+const mediaTexture = (item) => (item.kind === 'video'
+  ? videoTexture(item.blob)
+  : imageTexture(item.cut && !item.plain ? item.cut : item.blob));
 
 const mediaMaterial = (texture) => new THREE.MeshBasicMaterial({ map: texture, toneMapped: false });
 

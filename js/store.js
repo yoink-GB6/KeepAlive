@@ -13,6 +13,7 @@ export const defaults = {
   reverse: false,
   loop: true,
   muted: false,
+  cutout: true, // 导入照片时自动抠掉背景
   current: 'jellyfish',
   text: '✦ HELLO ✦',
   playlist: {}, // id -> { on, secs }
@@ -67,6 +68,13 @@ export async function addItem(item) {
     memory.push(it);
     return it;
   }
+}
+
+// 把改过的条目写回去。只存在内存里的条目和调用方手里的是同一个对象，不用另存
+export async function updateItem(item) {
+  if (memory.includes(item)) return;
+  const { persisted, ...rest } = item;
+  try { await tx('readwrite', (s) => s.put(rest)); } catch { /* 忽略 */ }
 }
 
 export async function deleteItem(id) {

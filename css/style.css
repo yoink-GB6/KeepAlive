@@ -101,6 +101,9 @@ button.link { background: none; border: 0; padding: 8px 4px; color: #a8a8b3; tex
 #list input[type="number"] { width: 62px; padding: 8px 6px; text-align: right; }
 #list .unit { color: #a8a8b3; font-size: 13px; }
 .del { padding: 8px 10px; color: #ff8080; }
+/* 抠图 / 原图切换：亮着表示正在用抠好的图 */
+.cut { padding: 8px 6px; font-size: 13px; color: #a8a8b3; }
+.cut[aria-pressed="true"] { border-color: #ff4f8b; color: #ffb3cf; }
 
 #music { display: flex; align-items: center; gap: 6px; margin: 8px 0; min-height: 40px; }
 #musicName { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

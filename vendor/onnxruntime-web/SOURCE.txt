@@ -1,0 +1,8 @@
+ONNX Runtime Web 1.18.0（npm 包 onnxruntime-web@1.18.0，MIT 许可，见同目录 LICENSE）
+来源：https://registry.npmjs.org/onnxruntime-web/-/onnxruntime-web-1.18.0.tgz
+只取了 dist/ 里的两个文件，未做修改：
+  ort.wasm.min.js      sha256 90533a3fd7006df7f897c0d63c468996da5c8e430e39964d92ebe586c4996614
+  ort-wasm-simd.wasm   sha256 f533b5f21790563d7556c611c3835ac65848ee326da2689aac54ed7d9cc8c6a4
+选这个版本是因为它还带单线程的 SIMD 构建：GitHub Pages 没有跨源隔离，用不了多线程；
+之后的版本只发布多线程构建，文件也更大。
+LICENSE 取自 microsoft/onnxruntime 仓库的 v1.18.0 标签。

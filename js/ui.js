@@ -7,7 +7,7 @@ const SLIDERS = {
   spin: (v) => (v === 0 ? '停' : `${(v * 9.55).toFixed(1)} 圈/分`),
   elevation: (v) => `${v}°`,
 };
-const CHECKS = ['flip', 'mirror', 'reverse', 'calib', 'loop', 'muted'];
+const CHECKS = ['flip', 'mirror', 'reverse', 'calib', 'loop', 'muted', 'cutout'];
 const WIZARD_SLIDERS = { size: 'wizSize', dist: 'wizDist' }; // 向导里重复出现的滑块
 
 // 向导的前三步各对应一个开关：答"不对"就切换它，然后原地再问一遍，让用户用眼睛确认
@@ -149,18 +149,29 @@ export function initUI(app) {
   document.addEventListener('pointerdown', keepAwake);
   document.addEventListener('visibilitychange', keepAwake);
 
-  // 短时间内的多条提示叠在一起显示，不互相覆盖
+  // 短时间内的多条提示叠在一起显示，不互相覆盖。
+  // 进度提示（抠图要好几秒）排在最下面一行，不会自己消失，由调用方清掉
   let toastTimer;
   let toastLines = [];
+  let progressLine = '';
+  const renderToast = () => {
+    const lines = toastLines.slice(-4);
+    if (progressLine) lines.push(progressLine);
+    toastEl.textContent = lines.join('\n');
+    toastEl.hidden = !lines.length;
+  };
   function toast(message) {
     toastLines.push(message);
-    toastEl.textContent = toastLines.slice(-4).join('\n');
-    toastEl.hidden = false;
+    renderToast();
     clearTimeout(toastTimer);
     toastTimer = setTimeout(() => {
-      toastEl.hidden = true;
       toastLines = [];
+      renderToast();
     }, 4500);
+  }
+  function progress(message) {
+    progressLine = message || '';
+    renderToast();
   }
 
   function refresh() {
@@ -202,6 +213,16 @@ export function initUI(app) {
       unit.textContent = '秒';
 
       li.append(on, name, secs, unit);
+      if (e.cut !== undefined) {
+        const cut = document.createElement('button');
+        cut.className = 'cut';
+        cut.textContent = '抠图';
+        cut.title = '在抠图和原图之间切换';
+        cut.setAttribute('aria-pressed', e.cut);
+        cut.setAttribute('aria-label', `"${e.name}"抠掉背景`);
+        cut.addEventListener('click', () => app.toggleCut(e.id));
+        li.append(cut);
+      }
       if (e.removable) {
         const del = document.createElement('button');
         del.className = 'del';
@@ -216,5 +237,5 @@ export function initUI(app) {
     }
   }
 
-  return { refresh, toast };
+  return { refresh, toast, progress };
 }
