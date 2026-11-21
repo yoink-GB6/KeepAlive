@@ -81,7 +81,7 @@ function poseBox(root) {
 // tune 是可选的微调：
 //   rotate   [x, y, z] 角度，适配大小之前先把模型摆正
 //   scale    在自动适配的基础上再缩放
-//   hide     名字匹配这个正则的网格不显示，也不参与适配
+//   hide     名字匹配这个正则的网格不显示，也不参与适配；匹配的骨骼缩成一个点，它带动的那部分跟着消失
 //   glow     贴图是黑底发光图案的模型：不受光照，颜色贴图和自发光贴图合在一起叠加绘制，黑的地方就是透明。
 //            值是亮度，层层相叠太白就调低
 //   gamma    小于 1 时把颜色的暗部提亮（棱锥里深色几乎看不见），亮部基本不变
@@ -99,6 +99,7 @@ async function modelScene(blob, tune = {}) {
   let mixer = null;
   let skinned = 0;
   root.traverse((o) => {
+    if (o.isBone && tune.hide?.test(o.name)) o.scale.setScalar(0);
     if (!o.isMesh) return;
     if (tune.hide?.test(o.name)) return hidden.push(o);
     if (tune.glow) {
