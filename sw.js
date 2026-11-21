@@ -1,5 +1,5 @@
 // 离线缓存。联网时优先取最新文件（方便更新），3 秒内取不到或断网时用缓存。
-const CACHE = 'holo-v6';
+const CACHE = 'holo-v7';
 const ASSETS = [
   './',
   'index.html',
@@ -31,6 +31,10 @@ const ASSETS = [
   'vendor/three/libs/draco/gltf/draco_decoder.js',
   'vendor/three/libs/draco/gltf/draco_decoder.wasm',
   'vendor/three/libs/draco/gltf/draco_wasm_wrapper.js',
+];
+// 体积大的可选内容：抠图的运行库和模型、内置的 3D 模型。存储空间不够时它们可能存不进去，
+// 不能因此让整个离线功能装不上，所以单独尽力缓存；没存上的，联网时照常能用，用过一次也会被缓存。
+const EXTRAS = [
   'vendor/onnxruntime-web/ort.wasm.min.js',
   'vendor/onnxruntime-web/ort-wasm-simd.wasm',
   'vendor/u2netp/u2netp.onnx',
@@ -41,7 +45,12 @@ const ASSETS = [
 ];
 
 self.addEventListener('install', (e) => {
-  e.waitUntil(caches.open(CACHE).then((c) => c.addAll(ASSETS)).then(() => self.skipWaiting()));
+  e.waitUntil((async () => {
+    const c = await caches.open(CACHE);
+    await c.addAll(ASSETS);
+    await Promise.allSettled(EXTRAS.map((url) => c.add(url)));
+    await self.skipWaiting();
+  })());
 });
 
 self.addEventListener('activate', (e) => {
@@ -62,7 +71,7 @@ self.addEventListener('fetch', (e) => {
         fetch(req),
         new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 3000)),
       ]);
-      if (res.ok) cache.put(req, res.clone());
+      if (res.ok) cache.put(req, res.clone()).catch(() => {}); // 空间不够存不进去也不影响这次返回
       return res;
     } catch (err) {
       const hit = await cache.match(req, { ignoreSearch: true });

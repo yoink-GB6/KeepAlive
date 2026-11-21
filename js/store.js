@@ -14,6 +14,7 @@ export const defaults = {
   loop: true,
   muted: false,
   cutout: true, // 导入照片时自动抠掉背景
+  sleep: 0, // 定时息屏，单位分钟；0 是关闭
   current: 'jellyfish',
   text: '✦ HELLO ✦',
   playlist: {}, // id -> { on, secs }

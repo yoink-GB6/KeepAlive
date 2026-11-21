@@ -179,6 +179,17 @@ async function imageTexture(blob) {
   return { texture, aspect: c.width / c.height, dispose() { texture.dispose(); } };
 }
 
+// 所有正在用的视频（相册里的也算）。息屏时一起停，醒来接着放
+const videos = new Set();
+let videosPaused = false;
+export function pauseVideos(on) {
+  videosPaused = on;
+  for (const v of videos) {
+    if (on) v.pause();
+    else v.play().catch(() => {});
+  }
+}
+
 async function videoTexture(blob) {
   const url = URL.createObjectURL(blob);
   const v = document.createElement('video');
@@ -187,7 +198,7 @@ async function videoTexture(blob) {
   v.playsInline = true;
   v.setAttribute('playsinline', '');
   v.src = url;
-  const release = () => { v.pause(); v.removeAttribute('src'); v.load(); URL.revokeObjectURL(url); };
+  const release = () => { videos.delete(v); v.pause(); v.removeAttribute('src'); v.load(); URL.revokeObjectURL(url); };
   try {
     await new Promise((resolve, reject) => {
       v.onloadeddata = resolve;
@@ -197,7 +208,8 @@ async function videoTexture(blob) {
     release();
     throw e;
   }
-  v.play().catch(() => {});
+  videos.add(v);
+  if (!videosPaused) v.play().catch(() => {});
   const texture = new THREE.VideoTexture(v);
   texture.colorSpace = THREE.SRGBColorSpace;
   return {
@@ -231,6 +243,13 @@ async function mediaScene(item) {
   }
   // video 交给外面决定要不要出声；相册里的视频不暴露，始终静音
   return { object: group, spin: false, video: media.video, update() {}, dispose: media.dispose };
+}
+
+// 四分屏视频：一个画面里已经排好了四个方向（网上现成的全息视频大多如此）。
+// 不进三维场景，direct 交给 QuadView 原样铺到屏幕上
+async function quadScene(item) {
+  const media = await videoTexture(item.blob);
+  return { object: new THREE.Group(), spin: false, video: media.video, direct: media, update() {}, dispose: media.dispose };
 }
 
 // 多张照片或视频：贴在棱柱各个侧面上缓慢旋转
@@ -280,5 +299,6 @@ export async function audioPlayer(blob) {
 }
 
 export function itemScene(item) {
-  return item.kind === 'model' ? modelScene(item.blob) : mediaScene(item);
+  if (item.kind === 'model') return modelScene(item.blob);
+  return item.kind === 'video' && item.quad ? quadScene(item) : mediaScene(item);
 }

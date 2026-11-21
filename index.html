@@ -35,6 +35,7 @@
     <input type="file" id="file" multiple hidden>
     <label class="check"><input type="checkbox" id="cutout"><span>导入照片时自动抠掉背景</span></label>
     <p class="note">抠图在本机完成，照片不会上传，每张要等几秒。抠得不好可以点列表里的"抠图"换回原图。</p>
+    <p class="note">网上现成的全息视频（一个画面里已经排好四个方向）导入后点列表里的"四分屏"，就按原样显示，用"画面大小"缩放到和棱锥对上。</p>
     <label class="field"><span>文字环的内容</span><input id="text" type="text" maxlength="40" autocomplete="off"></label>
     <label class="check"><input type="checkbox" id="loop"><span>自动轮播</span></label>
   </section>
@@ -63,6 +64,18 @@
     <label class="check"><input type="checkbox" id="muted"><span>静音</span></label>
     <p id="music"><span id="musicName"></span><button id="musicDel" class="del" aria-label="删除背景音乐">✕</button></p>
     <p class="note">背景音乐用上面的"导入"按钮添加，只保留一首，循环播放。单独播放视频时出视频的声音，音乐暂停；相册里的视频不出声。</p>
+  </section>
+
+  <section>
+    <h2>息屏</h2>
+    <label class="field"><span>定时息屏</span><select id="sleep">
+      <option value="0">关闭</option>
+      <option value="15">15 分钟</option>
+      <option value="30">30 分钟</option>
+      <option value="60">1 小时</option>
+      <option value="120">2 小时</option>
+    </select></label>
+    <p class="note">到时间后画面变黑、声音暂停，屏幕交给系统自动熄灭。点一下屏幕唤醒；期间有操作会重新计时。</p>
   </section>
 
   <p id="iosTip" class="note" hidden>iPhone 请在 Safari 里点"分享 → 添加到主屏幕"，再从主屏幕图标打开，就能全屏。</p>

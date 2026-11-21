@@ -55,6 +55,13 @@ export function initUI(app) {
     input.addEventListener('change', () => setCheck(key, input.checked));
   }
 
+  const sleep = $('sleep');
+  sleep.value = settings.sleep;
+  sleep.addEventListener('change', () => {
+    settings.sleep = Number(sleep.value);
+    app.changed('sleep');
+  });
+
   const text = $('text');
   text.value = settings.text;
   text.addEventListener('input', () => {
@@ -62,16 +69,22 @@ export function initUI(app) {
     app.changed('text');
   });
 
+  let hintTimer;
+  const hideHint = () => {
+    clearTimeout(hintTimer);
+    hint.hidden = true;
+  };
+
   // 点画面开关设置面板
   const setOpen = (open) => {
     panel.hidden = !open;
-    hint.hidden = true;
+    hideHint();
   };
   $('stage').addEventListener('click', () => {
     if (wizard.hidden) setOpen(panel.hidden); // 向导进行中点画面不弹出面板
   });
   $('closeBtn').addEventListener('click', () => setOpen(false));
-  setTimeout(() => { hint.hidden = true; }, 5000);
+  hintTimer = setTimeout(hideHint, 5000);
 
   // 校准向导
   const wizard = $('wizard');
@@ -114,11 +127,14 @@ export function initUI(app) {
   });
 
   const file = $('file');
+  let importing = 0;
   $('importBtn').addEventListener('click', () => file.click());
   file.addEventListener('change', async () => {
     const files = [...file.files];
     file.value = '';
-    if (files.length) await app.importFiles(files);
+    if (!files.length) return;
+    importing++;
+    try { await app.importFiles(files); } finally { importing--; }
   });
 
   // 全屏。iPhone 的 Safari 不支持，只能"添加到主屏幕"
@@ -137,17 +153,36 @@ export function initUI(app) {
     }
   });
 
-  // 防止息屏。必须在用户操作之后申请，切回页面时要重新申请
+  // 防止息屏。必须在用户操作之后申请，切回页面时要重新申请。
+  // 定时息屏之后反过来：把锁放开，醒来之前谁也别再申请
   let wakeLock = null;
+  let wantAwake = true;
+  let locking = false;
   const keepAwake = async () => {
-    if (!('wakeLock' in navigator) || wakeLock || document.visibilityState !== 'visible') return;
+    if (!wantAwake || locking || wakeLock || !('wakeLock' in navigator) || document.visibilityState !== 'visible') return;
+    locking = true;
     try {
-      wakeLock = await navigator.wakeLock.request('screen');
-      wakeLock.addEventListener('release', () => { wakeLock = null; });
+      const lock = await navigator.wakeLock.request('screen');
+      lock.addEventListener('release', () => { if (wakeLock === lock) wakeLock = null; });
+      if (wantAwake) wakeLock = lock;
+      else lock.release().catch(() => {}); // 申请到手之前已经息屏了
     } catch { /* 电量低等情况下会被拒绝 */ }
+    locking = false;
   };
   document.addEventListener('pointerdown', keepAwake);
   document.addEventListener('visibilitychange', keepAwake);
+
+  // 定时息屏开始 / 结束。提示只露几秒：全黑的屏幕上长时间留字会烧屏
+  function sleeping(on) {
+    wantAwake = !on;
+    if (on) wakeLock?.release().catch(() => {});
+    else keepAwake();
+    hideHint();
+    hint.textContent = '点一下屏幕唤醒';
+    hint.classList.toggle('faint', on);
+    hint.hidden = !on;
+    if (on) hintTimer = setTimeout(hideHint, 5000);
+  }
 
   // 短时间内的多条提示叠在一起显示，不互相覆盖。
   // 进度提示（抠图要好几秒）排在最下面一行，不会自己消失，由调用方清掉
@@ -213,15 +248,22 @@ export function initUI(app) {
       unit.textContent = '秒';
 
       li.append(on, name, secs, unit);
+      // 条目自己的小开关，放在名称和秒数之间，各行的秒数才对得齐
+      const toggle = (className, label, pressed, title, aria, onClick) => {
+        const b = document.createElement('button');
+        b.className = className;
+        b.textContent = label;
+        b.title = title;
+        b.setAttribute('aria-pressed', pressed);
+        b.setAttribute('aria-label', aria);
+        b.addEventListener('click', onClick);
+        secs.before(b);
+      };
       if (e.cut !== undefined) {
-        const cut = document.createElement('button');
-        cut.className = 'cut';
-        cut.textContent = '抠图';
-        cut.title = '在抠图和原图之间切换';
-        cut.setAttribute('aria-pressed', e.cut);
-        cut.setAttribute('aria-label', `"${e.name}"抠掉背景`);
-        cut.addEventListener('click', () => app.toggleCut(e.id));
-        secs.before(cut); // 放在名称和秒数之间，各行的秒数才对得齐
+        toggle('cut', '抠图', e.cut, '在抠图和原图之间切换', `"${e.name}"抠掉背景`, () => app.toggleCut(e.id));
+      }
+      if (e.quad !== undefined) {
+        toggle('quad', '四分屏', e.quad, '视频里已经排好四个方向的画面时打开，按原样显示', `"${e.name}"按四分屏视频原样显示`, () => app.toggleQuad(e.id));
       }
       if (e.removable) {
         const del = document.createElement('button');
@@ -237,5 +279,8 @@ export function initUI(app) {
     }
   }
 
-  return { refresh, toast, progress };
+  // 设置面板或校准向导开着、正在导入：用户还在操作，这时候不该息屏
+  const busy = () => !panel.hidden || !wizard.hidden || importing > 0;
+
+  return { refresh, toast, progress, busy, sleeping };
 }

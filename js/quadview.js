@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { defaults } from './store.js';
 
 // 屏幕上的四块画面：下、右、上、左（屏幕坐标 y 向上）。
 // 值是从屏幕中心指向该块的单位向量，也就是站在那一侧的观看者所在的方向。
@@ -12,6 +13,7 @@ export class QuadView {
     this.fov = 30;
     this.fitRadius = 1.2; // 场景内容应保持在半径 1 以内
     this.fade = 1;
+    this.direct = null; // { texture, aspect }：有值时不画四块，把这张画面原样铺到屏幕上（四分屏视频）
     this.comp = new THREE.Scene();
     this.ortho = new THREE.OrthographicCamera(-1, 1, 1, -1, -1, 1);
     this._size = new THREE.Vector2();
@@ -52,7 +54,7 @@ export class QuadView {
       outline.frustumCulled = false;
       this.comp.add(outline);
 
-      return { dir, cam, target, position, mat, outline };
+      return { dir, cam, target, position, mat, mesh: quad, outline };
     });
 
     const crossGeo = new THREE.BufferGeometry();
@@ -60,6 +62,13 @@ export class QuadView {
     this.cross = new THREE.LineSegments(crossGeo, lineMat);
     this.cross.frustumCulled = false;
     this.comp.add(this.cross);
+
+    this.plane = new THREE.Mesh(
+      new THREE.PlaneGeometry(1, 1),
+      new THREE.MeshBasicMaterial({ depthTest: false, depthWrite: false, toneMapped: false }),
+    );
+    this.plane.visible = false;
+    this.comp.add(this.plane);
   }
 
   layout(w, h, s) {
@@ -108,13 +117,31 @@ export class QuadView {
     r.getDrawingBufferSize(this._size);
     this.layout(this._size.x, this._size.y, s);
 
+    const d = this.direct;
+    const level = s.brightness * this.fade;
     for (const t of this.tiles) {
+      t.mesh.visible = !d;
+      t.outline.visible = s.calib;
+      if (d) continue; // 四块不显示，也就不用渲染
       r.setRenderTarget(t.target);
       r.render(this.scene, t.cam);
-      t.mat.color.setScalar(s.brightness * this.fade);
-      t.outline.visible = s.calib;
+      t.mat.color.setScalar(level);
     }
     this.cross.visible = s.calib;
+
+    const p = this.plane;
+    p.visible = !!d;
+    if (d) {
+      // 画面正中的正方形（边长取短边）对到屏幕正中的正方形上，多出来的两边任它出屏。
+      // "画面大小"取默认值时正好一比一，往两头拖就是缩放，用来对上棱锥的大小
+      const side = Math.min(this._size.x, this._size.y) * (s.size / defaults.size);
+      p.scale.set(side * Math.max(1, d.aspect), side * Math.max(1, 1 / d.aspect), 1);
+      if (p.material.map !== d.texture) {
+        p.material.map = d.texture;
+        p.material.needsUpdate = true;
+      }
+      p.material.color.setScalar(level);
+    }
     r.setRenderTarget(null);
     r.render(this.comp, this.ortho);
   }
