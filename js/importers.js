@@ -25,36 +25,140 @@ function loader() {
   return gltfLoader;
 }
 
-async function modelScene(item) {
+// 把颜色贴图和自发光贴图画到一张画布上相加，换成不受光照的叠加材质
+function glowMaterial(src, level) {
+  const maps = [src.map, src.emissiveMap].filter((t) => t?.image);
+  const out = new THREE.MeshBasicMaterial({
+    side: src.side,
+    blending: THREE.AdditiveBlending,
+    transparent: true,
+    depthWrite: false,
+    toneMapped: false,
+  });
+  out.color.copy(maps.length ? new THREE.Color(1, 1, 1) : src.color).multiplyScalar(level);
+  if (maps.length) {
+    const c = document.createElement('canvas');
+    c.width = maps[0].image.width;
+    c.height = maps[0].image.height;
+    const g = c.getContext('2d');
+    g.fillRect(0, 0, c.width, c.height);
+    g.globalCompositeOperation = 'lighter';
+    for (const t of maps) g.drawImage(t.image, 0, 0, c.width, c.height);
+    out.map = new THREE.CanvasTexture(c);
+    out.map.flipY = maps[0].flipY;
+    out.map.wrapS = maps[0].wrapS;
+    out.map.wrapT = maps[0].wrapT;
+    out.map.colorSpace = THREE.SRGBColorSpace;
+  }
+  for (const t of maps) t.dispose();
+  src.dispose();
+  return out;
+}
+
+function liftShadows(material, gamma) {
+  if (material.userData.gamma) return; // 多个网格共用同一个材质
+  material.userData.gamma = gamma;
+  material.onBeforeCompile = (shader) => {
+    shader.fragmentShader = shader.fragmentShader.replace(
+      '#include <map_fragment>',
+      `#include <map_fragment>\ndiffuseColor.rgb = pow(diffuseColor.rgb, vec3(${gamma.toFixed(3)}));`,
+    );
+  };
+  material.customProgramCacheKey = () => `gamma${gamma}`;
+}
+
+// 当前姿态下的包围盒。蒙皮网格的包围盒要按骨骼现算，否则拿到的是绑定姿态的
+function poseBox(root) {
+  root.updateMatrixWorld(true);
+  root.traverse((o) => {
+    if (!o.isSkinnedMesh) return;
+    o.skeleton.update();
+    o.computeBoundingBox();
+  });
+  return new THREE.Box3().setFromObject(root);
+}
+
+// tune 是可选的微调：
+//   rotate   [x, y, z] 角度，适配大小之前先把模型摆正
+//   scale    在自动适配的基础上再缩放
+//   hide     名字匹配这个正则的网格不显示，也不参与适配
+//   glow     贴图是黑底发光图案的模型：不受光照，颜色贴图和自发光贴图合在一起叠加绘制，黑的地方就是透明。
+//            值是亮度，层层相叠太白就调低
+//   gamma    小于 1 时把颜色的暗部提亮（棱锥里深色几乎看不见），亮部基本不变
+async function modelScene(blob, tune = {}) {
   let gltf;
   try {
-    gltf = await loader().parseAsync(await item.blob.arrayBuffer(), '');
+    gltf = await loader().parseAsync(await blob.arrayBuffer(), '');
   } catch (e) {
     throw new Error('模型无法解析，请使用单文件的 .glb 格式');
   }
   const root = gltf.scene;
-  root.updateMatrixWorld(true);
-  const box = new THREE.Box3().setFromObject(root);
+  if (tune.rotate) root.rotation.set(...tune.rotate.map(THREE.MathUtils.degToRad));
+  const hidden = [];
+  const glows = new Map(); // 原材质 -> 换上的材质，多个网格共用材质时只换一次
+  let mixer = null;
+  let skinned = 0;
+  root.traverse((o) => {
+    if (!o.isMesh) return;
+    if (tune.hide?.test(o.name)) return hidden.push(o);
+    if (tune.glow) {
+      if (!glows.has(o.material)) glows.set(o.material, glowMaterial(o.material, tune.glow));
+      o.material = glows.get(o.material);
+    }
+    if (tune.gamma) liftShadows(o.material, tune.gamma);
+    if (!o.isSkinnedMesh) return;
+    skinned += o.geometry.attributes.position.count;
+    o.frustumCulled = false; // 裁剪用的包围球不跟着动画变，动作大了会被误裁掉
+  });
+  for (const o of hidden) o.removeFromParent(); // 还没画过，显卡里没有它的东西，拿掉就行
+  const box = poseBox(root);
+  if (gltf.animations.length) {
+    mixer = new THREE.AnimationMixer(root);
+    const clip = gltf.animations[0];
+    mixer.clipAction(clip).play();
+    // 把整段动画扫一遍取并集，翅膀张到最开时也不会出画。顶点多的模型少采几帧
+    const n = Math.max(4, Math.min(32, Math.round(1e6 / (skinned + 1))));
+    for (let i = 1; i < n; i++) {
+      mixer.setTime((clip.duration * i) / n);
+      box.union(poseBox(root));
+    }
+    mixer.setTime(0);
+  }
   if (box.isEmpty()) throw new Error('模型里没有可显示的内容');
   const center = box.getCenter(new THREE.Vector3());
   const half = box.getSize(new THREE.Vector3()).multiplyScalar(0.5);
-  root.position.sub(center);
 
   // 模型绕竖直轴旋转，所以水平方向按对角线算占用半径
   const wrap = new THREE.Group();
   wrap.add(root);
-  wrap.scale.setScalar(0.9 / Math.max(half.y, Math.hypot(half.x, half.z), 1e-6));
+  wrap.scale.setScalar(((tune.scale ?? 1) * 0.9) / Math.max(half.y, Math.hypot(half.x, half.z), 1e-6));
+  wrap.position.copy(center).multiplyScalar(-wrap.scale.x);
 
-  let mixer = null;
-  if (gltf.animations.length) {
-    mixer = new THREE.AnimationMixer(root);
-    mixer.clipAction(gltf.animations[0]).play();
-  }
   return {
     object: wrap,
     update(dt) { mixer?.update(dt); },
     dispose() { mixer?.stopAllAction(); },
   };
+}
+
+// 随应用发布的模型：从服务器取文件，之后和导入的模型走同一条路。
+// 文件内容留在内存里，同一次打开期间再切回来不用重新下载
+const fetched = new Map();
+export async function fileModelScene({ file, ...tune }) {
+  if (!fetched.has(file)) {
+    fetched.set(file, fetch(file).then((res) => {
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      return res.blob();
+    }));
+  }
+  let blob;
+  try {
+    blob = await fetched.get(file);
+  } catch (e) {
+    fetched.delete(file); // 下次再试
+    throw new Error('模型下载失败，请联网后重试');
+  }
+  return modelScene(blob, tune);
 }
 
 async function imageTexture(blob) {
@@ -170,5 +274,5 @@ export async function audioPlayer(blob) {
 }
 
 export function itemScene(item) {
-  return item.kind === 'model' ? modelScene(item) : mediaScene(item);
+  return item.kind === 'model' ? modelScene(item.blob) : mediaScene(item);
 }

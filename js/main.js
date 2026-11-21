@@ -10,13 +10,21 @@ import galaxy from './scenes/galaxy.js';
 import globe from './scenes/globe.js';
 import textring from './scenes/textring.js';
 import calib from './scenes/calib.js';
-import { kindOf, itemScene, albumScene, audioPlayer } from './importers.js';
+import { kindOf, itemScene, fileModelScene, albumScene, audioPlayer } from './importers.js';
 import { initUI } from './ui.js';
+
+// 随应用发布的模型，加一行就多一个。id 会存进设置里，定了就别改。
+// 可选的微调（rotate、scale、hide、glow、gamma）见 importers.js 的 modelScene
+const MODELS = [
+  { id: 'model:butterfly', name: '蝴蝶', file: 'glbs/fantasy_butterfly_animation.glb', rotate: [-70, 0, 0], scale: 1.2, glow: 0.6 },
+  { id: 'model:bangboo', name: '邦布', file: 'glbs/bangboo_01_-_eous.glb', scale: 1.15, hide: /stool/, gamma: 0.7 },
+];
 
 const BUILTINS = [
   { id: 'jellyfish', name: '水母', make: jellyfish },
   { id: 'fireworks', name: '烟花', make: fireworks },
   { id: 'spiral', name: '旋涡星系', make: spiral },
+  ...MODELS.map(({ id, name, ...model }) => ({ id, name, make: () => fileModelScene(model) })),
   { id: 'galaxy', name: '粒子星球', make: galaxy },
   { id: 'globe', name: '线框地球', make: globe },
   { id: 'text', name: '文字环', make: textring },
@@ -103,13 +111,17 @@ let shownAt = 0;
 let fadeTarget = 0; // 启动时从全黑淡入
 let fadeWaiters = [];
 let now = 0;
+// 载入失败的内容（比如断网时还没缓存过的模型）。轮播跳过它们，不然每转一圈都要再失败、再提示一次；
+// 手动点还是会重试，重新联网后也全部重试
+const broken = new Set();
+window.addEventListener('online', () => broken.clear());
 
 function fadeTo(v) {
   fadeTarget = v;
   return new Promise((resolve) => fadeWaiters.push(resolve));
 }
 
-async function show(id, remember = true) {
+async function show(id, remember = true, auto = false) {
   const my = ++token;
   if (remember) {
     settings.current = id;
@@ -122,9 +134,13 @@ async function show(id, remember = true) {
   } catch (e) {
     console.error(e);
     ui.toast(`无法显示：${e.message || e}`);
-    if (my === token && id !== FALLBACK) show(FALLBACK);
+    broken.add(id);
+    // 轮播途中失败就接着播下一个，其余情况退回默认内容
+    const next = (auto && nextInLoop()) || FALLBACK;
+    if (my === token && id !== next) show(next, true, auto);
     return;
   }
+  broken.delete(id);
   if (my !== token) return disposeScene(next);
   await fadeTo(0);
   if (my !== token) return disposeScene(next);
@@ -141,12 +157,16 @@ async function show(id, remember = true) {
   fadeTo(1);
 }
 
+// 从当前内容往后找下一个参加轮播的，找一圈也没有就返回 null
 function nextInLoop() {
-  const list = entries().filter((e) => cfgOf(e.id).on);
-  if (!list.length) return null;
-  const i = list.findIndex((e) => e.id === settings.current);
-  const next = list[(i + 1) % list.length].id;
-  return next === settings.current ? null : next;
+  const all = entries();
+  const i = all.findIndex((e) => e.id === settings.current);
+  for (let k = 1; k <= all.length; k++) {
+    const e = all[(i + k) % all.length];
+    if (e.id === settings.current) break;
+    if (cfgOf(e.id).on && !broken.has(e.id)) return e.id;
+  }
+  return null;
 }
 
 // ---------- 声音 ----------
@@ -289,7 +309,7 @@ function frame(time) {
   const idle = shownToken === token && quad.fade === 1;
   if (settings.loop && !settings.calib && idle && now - shownAt > cfgOf(settings.current).secs) {
     const next = nextInLoop();
-    if (next) show(next);
+    if (next) show(next, true, true);
     else shownAt = now;
   }
 
