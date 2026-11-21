@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>全息棱锥</title>
+<meta name="theme-color" content="#000000">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/icon-180.png">
+<link rel="stylesheet" href="css/style.css">
+<script type="importmap">
+{ "imports": { "three": "./vendor/three/three.module.min.js", "three/addons/": "./vendor/three/" } }
+</script>
+</head>
+<body>
+<canvas id="stage"></canvas>
+
+<p id="hint">点一下屏幕打开设置</p>
+<p id="toast" role="status" hidden></p>
+<p id="fatal" hidden>这台设备的浏览器无法启用 3D 渲染（WebGL），请换一个浏览器试试。</p>
+
+<aside id="panel" hidden>
+  <header>
+    <h1>全息棱锥</h1>
+    <button id="closeBtn" class="primary">收起</button>
+  </header>
+
+  <section>
+    <h2>内容</h2>
+    <p class="note">点名称立即播放；勾选的内容会按右边的秒数轮播。</p>
+    <ul id="list"></ul>
+    <button id="importBtn">导入模型（.glb）、照片或视频</button>
+    <input type="file" id="file" multiple hidden>
+    <label class="field"><span>文字环的内容</span><input id="text" type="text" maxlength="40" autocomplete="off"></label>
+    <label class="check"><input type="checkbox" id="loop"><span>自动轮播</span></label>
+  </section>
+
+  <section>
+    <h2>画面</h2>
+    <label class="slider"><span>画面大小</span><input type="range" id="size" min="0.12" max="0.5" step="0.005"><output id="sizeOut"></output></label>
+    <label class="slider"><span>离中心距离</span><input type="range" id="dist" min="0.2" max="0.9" step="0.005"><output id="distOut"></output></label>
+    <label class="slider"><span>亮度</span><input type="range" id="brightness" min="0.2" max="2" step="0.05"><output id="brightnessOut"></output></label>
+    <label class="slider"><span>旋转速度</span><input type="range" id="spin" min="0" max="1.5" step="0.05"><output id="spinOut"></output></label>
+    <label class="slider"><span>俯视角度</span><input type="range" id="elevation" min="-10" max="30" step="1"><output id="elevationOut"></output></label>
+  </section>
+
+  <section>
+    <h2>校准</h2>
+    <p class="note">打开校准方块，站在屏幕下边缘那一侧看棱锥：应看到正立、不反字的"前"；绕到右侧应看到"右"。不对就改下面三项。</p>
+    <label class="check"><input type="checkbox" id="calib"><span>显示校准方块和参考线</span></label>
+    <label class="check"><input type="checkbox" id="flip"><span>上下颠倒（影像倒立时打开）</span></label>
+    <label class="check"><input type="checkbox" id="mirror"><span>镜像修正（文字反了就切换）</span></label>
+    <label class="check"><input type="checkbox" id="reverse"><span>左右两侧对调（绕到右侧看到"左"时打开）</span></label>
+  </section>
+
+  <section>
+    <h2>设备</h2>
+    <button id="fullscreenBtn">全屏 / 退出全屏</button>
+    <p id="iosTip" class="note" hidden>iPhone 请在 Safari 里点"分享 → 添加到主屏幕"，再从主屏幕图标打开，就能全屏。</p>
+    <p class="note">把屏幕亮度调到最高、关灯，效果最好。导入的视频静音播放。</p>
+  </section>
+</aside>
+
+<script type="module" src="js/main.js"></script>
+</body>
+</html>
