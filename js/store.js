@@ -12,8 +12,9 @@ export const defaults = {
   mirror: true,
   reverse: false,
   loop: true,
-  current: 'heart',
-  text: 'LOVE ♥ FOREVER',
+  muted: false,
+  current: 'jellyfish',
+  text: '✦ HELLO ✦',
   playlist: {}, // id -> { on, secs }
 };
 

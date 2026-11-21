@@ -4,6 +4,7 @@ import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
 
 const IMAGE_EXT = ['jpg', 'jpeg', 'png', 'webp', 'gif', 'bmp', 'avif', 'heic'];
 const VIDEO_EXT = ['mp4', 'webm', 'mov', 'm4v', 'ogv'];
+const AUDIO_EXT = ['mp3', 'm4a', 'aac', 'ogg', 'wav', 'flac'];
 const MAX_TEXTURE = 1536; // 手机拍的照片动辄上千万像素，缩小后再上传显卡
 
 export function kindOf(file) {
@@ -11,6 +12,7 @@ export function kindOf(file) {
   if (ext === 'glb' || ext === 'gltf') return 'model';
   if (file.type.startsWith('image/') || IMAGE_EXT.includes(ext)) return 'image';
   if (file.type.startsWith('video/') || VIDEO_EXT.includes(ext)) return 'video';
+  if (file.type.startsWith('audio/') || AUDIO_EXT.includes(ext)) return 'audio';
   return null;
 }
 
@@ -93,6 +95,7 @@ async function videoTexture(blob) {
   texture.colorSpace = THREE.SRGBColorSpace;
   return {
     texture,
+    video: v,
     aspect: (v.videoWidth || 16) / (v.videoHeight || 9),
     dispose() { texture.dispose(); release(); },
   };
@@ -116,7 +119,8 @@ async function mediaScene(item) {
     m.translateZ(w / 2);
     group.add(m);
   }
-  return { object: group, spin: false, update() {}, dispose: media.dispose };
+  // video 交给外面决定要不要出声；相册里的视频不暴露，始终静音
+  return { object: group, spin: false, video: media.video, update() {}, dispose: media.dispose };
 }
 
 // 多张照片或视频：贴在棱柱各个侧面上缓慢旋转
@@ -144,6 +148,25 @@ export async function albumScene(items) {
     group.add(m);
   });
   return { object: group, update() {}, dispose() { medias.forEach((m) => m.dispose()); } };
+}
+
+// 背景音乐播放器。能读出元数据才算可用，导入时靠它验证文件
+export async function audioPlayer(blob) {
+  const url = URL.createObjectURL(blob);
+  const el = new Audio();
+  el.loop = true;
+  el.src = url;
+  const dispose = () => { el.pause(); el.removeAttribute('src'); el.load(); URL.revokeObjectURL(url); };
+  try {
+    await new Promise((resolve, reject) => {
+      el.onloadedmetadata = resolve;
+      el.onerror = () => reject(new Error('音频格式不支持'));
+    });
+  } catch (e) {
+    dispose();
+    throw e;
+  }
+  return { el, dispose };
 }
 
 export function itemScene(item) {

@@ -33,7 +33,7 @@
     <h2>内容</h2>
     <p class="note">点名称立即播放；勾选的内容会按右边的秒数轮播。</p>
     <ul id="list"></ul>
-    <button id="importBtn">导入模型（.glb）、照片或视频</button>
+    <button id="importBtn">导入模型（.glb）、照片、视频或音乐</button>
     <input type="file" id="file" multiple hidden>
     <label class="field"><span>文字环的内容</span><input id="text" type="text" maxlength="40" autocomplete="off"></label>
     <label class="check"><input type="checkbox" id="loop"><span>自动轮播</span></label>
@@ -50,7 +50,8 @@
 
   <section>
     <h2>校准</h2>
-    <p class="note">打开校准方块，站在屏幕下边缘那一侧看棱锥：应看到正立、不反字的"前"；绕到右侧应看到"右"。不对就改下面三项。</p>
+    <button id="wizardBtn">开始校准向导</button>
+    <p class="note">也可以手动调：打开校准方块，站在屏幕下边缘那一侧看棱锥：应看到正立、不反字的"前"；绕到右侧应看到"右"。不对就改下面三项。</p>
     <label class="check"><input type="checkbox" id="calib"><span>显示校准方块和参考线</span></label>
     <label class="check"><input type="checkbox" id="flip"><span>上下颠倒（影像倒立时打开）</span></label>
     <label class="check"><input type="checkbox" id="mirror"><span>镜像修正（文字反了就切换）</span></label>
@@ -58,12 +59,32 @@
   </section>
 
   <section>
+    <h2>声音</h2>
+    <label class="check"><input type="checkbox" id="muted"><span>静音</span></label>
+    <p id="music"><span id="musicName"></span><button id="musicDel" class="del" aria-label="删除背景音乐">✕</button></p>
+    <p class="note">背景音乐用上面的"导入"按钮添加，只保留一首，循环播放。单独播放视频时出视频的声音，音乐暂停；相册里的视频不出声。</p>
+  </section>
+
+  <section>
     <h2>设备</h2>
     <button id="fullscreenBtn">全屏 / 退出全屏</button>
     <p id="iosTip" class="note" hidden>iPhone 请在 Safari 里点"分享 → 添加到主屏幕"，再从主屏幕图标打开，就能全屏。</p>
-    <p class="note">把屏幕亮度调到最高、关灯，效果最好。导入的视频静音播放。</p>
+    <p class="note">把屏幕亮度调到最高、关灯，效果最好。</p>
   </section>
 </aside>
+
+<div id="wizard" role="dialog" aria-labelledby="wizStep" hidden>
+  <p id="wizText"></p>
+  <div id="wizSliders">
+    <label class="slider"><span>画面大小</span><input type="range" id="wizSize" min="0.12" max="0.5" step="0.005"><output id="wizSizeOut"></output></label>
+    <label class="slider"><span>离中心距离</span><input type="range" id="wizDist" min="0.2" max="0.9" step="0.005"><output id="wizDistOut"></output></label>
+  </div>
+  <div class="actions">
+    <button id="wizOk"></button>
+    <button id="wizFix"></button>
+    <span class="meta"><span id="wizStep"></span> <button id="wizQuit" class="link">退出校准</button></span>
+  </div>
+</div>
 
 <script type="module" src="js/main.js"></script>
 </body>

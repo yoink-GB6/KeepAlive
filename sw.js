@@ -1,5 +1,5 @@
 // 离线缓存。联网时优先取最新文件（方便更新），3 秒内取不到或断网时用缓存。
-const CACHE = 'holo-v1';
+const CACHE = 'holo-v2';
 const ASSETS = [
   './',
   'index.html',
@@ -14,7 +14,9 @@ const ASSETS = [
   'js/ui.js',
   'js/importers.js',
   'js/scenes/util.js',
-  'js/scenes/heart.js',
+  'js/scenes/jellyfish.js',
+  'js/scenes/fireworks.js',
+  'js/scenes/spiral.js',
   'js/scenes/galaxy.js',
   'js/scenes/globe.js',
   'js/scenes/textring.js',

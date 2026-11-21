@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { heartGeometry, heartbeat } from './heart.js';
+import { dotTexture } from './util.js';
 
 const H = 256;
 const RADIUS = 0.85;
@@ -28,9 +28,9 @@ function textTexture(text) {
   g.textAlign = 'center';
   const grad = g.createLinearGradient(0, 40, 0, H - 40);
   grad.addColorStop(0, '#ffffff');
-  grad.addColorStop(1, '#ff6fa8');
+  grad.addColorStop(1, '#6fdcff');
   g.fillStyle = grad;
-  g.shadowColor = '#ff3d85';
+  g.shadowColor = '#2fb8ff';
   g.shadowBlur = 24;
   for (let i = 0; i < repeat; i++) g.fillText(text, w * (i + 0.5), H / 2);
 
@@ -42,7 +42,7 @@ function textTexture(text) {
 
 export default function textring({ text }) {
   const group = new THREE.Group();
-  const { tex, aspect } = textTexture((text || '').trim() || '♥');
+  const { tex, aspect } = textTexture((text || '').trim() || '✦');
   const height = (2 * Math.PI * RADIUS) / aspect;
   const geo = new THREE.CylinderGeometry(RADIUS, RADIUS, height, 96, 1, true);
 
@@ -57,17 +57,33 @@ export default function textring({ text }) {
   }));
   group.add(side(THREE.BackSide, 0.22), side(THREE.FrontSide, 1));
 
-  const core = new THREE.Mesh(
-    heartGeometry(0.3),
-    new THREE.MeshStandardMaterial({ color: 0xff1f4f, emissive: 0x8a0020, roughness: 0.25, metalness: 0.2 }),
-  );
-  group.add(core);
+  // 中间的水晶：切面靠环境光分出明暗，棱线和光晕自己发光，在棱锥里才够亮
+  const crystal = new THREE.IcosahedronGeometry(0.27, 0);
+  const core = new THREE.Mesh(crystal, new THREE.MeshStandardMaterial({
+    color: 0x9fe8ff, emissive: 0x1a6f9a, roughness: 0.15, metalness: 0.3, flatShading: true,
+  }));
+  core.scale.y = 1.35;
+  core.add(new THREE.LineSegments(
+    new THREE.EdgesGeometry(crystal),
+    new THREE.LineBasicMaterial({ color: 0xeaffff }),
+  ));
+  const glow = new THREE.Sprite(new THREE.SpriteMaterial({
+    map: dotTexture(),
+    color: 0x3fc8ff,
+    transparent: true,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
+  }));
+  group.add(core, glow);
 
   return {
     object: group,
     update(dt, t) {
-      core.scale.setScalar(1 + 0.1 * heartbeat(t));
+      const breath = 0.5 + 0.5 * Math.sin(t * 1.6);
       core.rotation.y -= dt * 0.9; // 与外环反向转动
+      glow.scale.setScalar(0.85 + 0.25 * breath);
+      glow.material.opacity = 0.25 + 0.25 * breath;
+      core.material.emissiveIntensity = 0.8 + 0.7 * breath;
     },
   };
 }

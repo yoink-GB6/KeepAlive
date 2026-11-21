@@ -7,7 +7,16 @@ const SLIDERS = {
   spin: (v) => (v === 0 ? '停' : `${(v * 9.55).toFixed(1)} 圈/分`),
   elevation: (v) => `${v}°`,
 };
-const CHECKS = ['flip', 'mirror', 'reverse', 'calib', 'loop'];
+const CHECKS = ['flip', 'mirror', 'reverse', 'calib', 'loop', 'muted'];
+const WIZARD_SLIDERS = { size: 'wizSize', dist: 'wizDist' }; // 向导里重复出现的滑块
+
+// 向导的前三步各对应一个开关：答"不对"就切换它，然后原地再问一遍，让用户用眼睛确认
+const WIZARD_STEPS = [
+  { key: 'flip', ok: '正立', fix: '倒立', text: '把棱锥放在屏幕正中。从屏幕下边缘这一侧（这行字正着读时靠近你的那一边）平视棱锥，"前"字是正立的还是倒立的？' },
+  { key: 'mirror', ok: '正常', fix: '反了', text: '"前"字是正常的字，还是左右反了的镜像字？' },
+  { key: 'reverse', ok: '右', fix: '左', text: '绕到屏幕右边那一侧看棱锥，看到的是哪个字？' },
+  { ok: '完成', text: '拖动滑块，让四个影像都完整地落在棱锥面的中间，不被切掉。' },
+];
 
 export function initUI(app) {
   const { settings } = app;
@@ -16,25 +25,34 @@ export function initUI(app) {
   const hint = $('hint');
   const toastEl = $('toast');
 
+  // 同一个设置可能有两个滑块（面板里和向导里），改一个另一个跟着动
   for (const [key, format] of Object.entries(SLIDERS)) {
-    const input = $(key);
-    const out = $(`${key}Out`);
-    input.value = settings[key];
-    out.textContent = format(Number(input.value));
-    input.addEventListener('input', () => {
-      settings[key] = Number(input.value);
-      out.textContent = format(settings[key]);
-      app.changed(key);
-    });
+    const ids = [key, WIZARD_SLIDERS[key]].filter(Boolean);
+    const sync = () => {
+      for (const id of ids) {
+        $(id).value = settings[key];
+        $(`${id}Out`).textContent = format(settings[key]);
+      }
+    };
+    sync();
+    for (const id of ids) {
+      $(id).addEventListener('input', () => {
+        settings[key] = Number($(id).value);
+        sync();
+        app.changed(key);
+      });
+    }
   }
 
+  const setCheck = (key, value) => {
+    settings[key] = value;
+    $(key).checked = value;
+    app.changed(key);
+  };
   for (const key of CHECKS) {
     const input = $(key);
     input.checked = !!settings[key];
-    input.addEventListener('change', () => {
-      settings[key] = input.checked;
-      app.changed(key);
-    });
+    input.addEventListener('change', () => setCheck(key, input.checked));
   }
 
   const text = $('text');
@@ -49,9 +67,51 @@ export function initUI(app) {
     panel.hidden = !open;
     hint.hidden = true;
   };
-  $('stage').addEventListener('click', () => setOpen(panel.hidden));
+  $('stage').addEventListener('click', () => {
+    if (wizard.hidden) setOpen(panel.hidden); // 向导进行中点画面不弹出面板
+  });
   $('closeBtn').addEventListener('click', () => setOpen(false));
   setTimeout(() => { hint.hidden = true; }, 5000);
+
+  // 校准向导
+  const wizard = $('wizard');
+  let wizardStep = 0;
+  const showStep = (i, adjusted = false) => {
+    wizardStep = i;
+    const s = WIZARD_STEPS[i];
+    $('wizStep').textContent = `校准 ${i + 1} / ${WIZARD_STEPS.length}`;
+    $('wizText').textContent = (adjusted ? '已调整，再看一眼。' : '') + s.text;
+    $('wizSliders').hidden = !!s.key;
+    $('wizOk').textContent = s.ok;
+    $('wizOk').classList.toggle('primary', !s.key);
+    $('wizFix').hidden = !s.key;
+    $('wizFix').textContent = s.fix || '';
+  };
+  const closeWizard = () => {
+    wizard.hidden = true;
+    if (settings.calib) setCheck('calib', false); // 回到原来播放的内容
+  };
+  $('wizardBtn').addEventListener('click', () => {
+    setOpen(false);
+    if (!settings.calib) setCheck('calib', true);
+    showStep(0);
+    wizard.hidden = false;
+  });
+  $('wizOk').addEventListener('click', () => {
+    if (wizardStep < WIZARD_STEPS.length - 1) return showStep(wizardStep + 1);
+    closeWizard();
+    toast('校准完成，设置已保存');
+  });
+  $('wizFix').addEventListener('click', () => {
+    const { key } = WIZARD_STEPS[wizardStep];
+    setCheck(key, !settings[key]);
+    showStep(wizardStep, true);
+  });
+  $('wizQuit').addEventListener('click', closeWizard);
+
+  $('musicDel').addEventListener('click', () => {
+    if (confirm('删除背景音乐？')) app.removeMusic();
+  });
 
   const file = $('file');
   $('importBtn').addEventListener('click', () => file.click());
@@ -104,6 +164,10 @@ export function initUI(app) {
   }
 
   function refresh() {
+    const music = app.music();
+    $('musicName').textContent = `背景音乐：${music ?? '未导入'}`;
+    $('musicDel').hidden = music === null;
+
     list.textContent = '';
     for (const e of app.entries()) {
       const cfg = app.cfgOf(e.id);

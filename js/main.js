@@ -3,26 +3,32 @@ import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { QuadView } from './quadview.js';
 import { loadSettings, saveSettings, listItems, addItem, deleteItem } from './store.js';
 import { disposeObject } from './scenes/util.js';
-import heart from './scenes/heart.js';
+import jellyfish from './scenes/jellyfish.js';
+import fireworks from './scenes/fireworks.js';
+import spiral from './scenes/spiral.js';
 import galaxy from './scenes/galaxy.js';
 import globe from './scenes/globe.js';
 import textring from './scenes/textring.js';
 import calib from './scenes/calib.js';
-import { kindOf, itemScene, albumScene } from './importers.js';
+import { kindOf, itemScene, albumScene, audioPlayer } from './importers.js';
 import { initUI } from './ui.js';
 
 const BUILTINS = [
-  { id: 'heart', name: '跳动的心', make: heart },
+  { id: 'jellyfish', name: '水母', make: jellyfish },
+  { id: 'fireworks', name: '烟花', make: fireworks },
+  { id: 'spiral', name: '旋涡星系', make: spiral },
   { id: 'galaxy', name: '粒子星球', make: galaxy },
   { id: 'globe', name: '线框地球', make: globe },
   { id: 'text', name: '文字环', make: textring },
 ];
+const FALLBACK = BUILTINS[0].id; // 当前内容不存在或载入失败时退回这里
 const KIND_LABEL = { model: '模型', image: '照片', video: '视频' };
 const FADE_SECONDS = 0.35;
 
 const settings = loadSettings();
 const save = () => saveSettings(settings);
-let items = [];
+let items = [];   // 模型、照片、视频；背景音乐不在这里面
+let music = null; // { item, player }，最多一首
 
 const canvas = document.getElementById('stage');
 let renderer;
@@ -57,7 +63,7 @@ resize();
 
 // ---------- 内容列表 ----------
 
-const isMedia = (it) => it.kind !== 'model';
+const isMedia = (it) => it.kind === 'image' || it.kind === 'video';
 
 function entries() {
   const list = BUILTINS.map((b) => ({ id: b.id, name: b.name }));
@@ -116,7 +122,7 @@ async function show(id, remember = true) {
   } catch (e) {
     console.error(e);
     ui.toast(`无法显示：${e.message || e}`);
-    if (my === token && id !== 'heart') show('heart');
+    if (my === token && id !== FALLBACK) show(FALLBACK);
     return;
   }
   if (my !== token) return disposeScene(next);
@@ -127,6 +133,7 @@ async function show(id, remember = true) {
     disposeScene(cur);
   }
   cur = next;
+  applyAudio();
   stage.rotation.y = 0;
   stage.add(cur.object);
   shownToken = my;
@@ -140,6 +147,41 @@ function nextInLoop() {
   const i = list.findIndex((e) => e.id === settings.current);
   const next = list[(i + 1) % list.length].id;
   return next === settings.current ? null : next;
+}
+
+// ---------- 声音 ----------
+
+// 浏览器在用户第一次操作之前不允许出声：视频一律先静音起播，等有过操作再放开
+let gestured = false;
+const canSound = () => (navigator.userActivation ? navigator.userActivation.hasBeenActive : gestured);
+
+// 所有"现在该不该响"的判断都在这里。切换内容、改静音、第一次操作、换音乐之后都调一次
+function applyAudio() {
+  const sound = canSound() && !settings.muted;
+  const v = cur?.video; // 只有单独播放的视频才有
+  if (v) {
+    v.muted = !sound;
+    // 个别浏览器会在取消静音时把视频停掉，这种情况退回静音继续播
+    if (v.paused) v.play().catch(() => { v.muted = true; v.play().catch(() => {}); });
+  }
+  const el = music?.player?.el;
+  if (!el) return;
+  if (sound && !v) el.play().catch(() => {}); // 视频自己出声时音乐让路
+  else el.pause();
+}
+
+for (const type of ['click', 'keydown']) {
+  window.addEventListener(type, () => { gestured = true; applyAudio(); }, true);
+}
+
+async function setMusic(item, player) {
+  const old = music;
+  music = { item, player };
+  if (old) {
+    old.player?.dispose();
+    await deleteItem(old.item.id);
+  }
+  applyAudio();
 }
 
 // ---------- 界面回调 ----------
@@ -157,6 +199,7 @@ const app = {
   changed(key) {
     save();
     if (key === 'calib') show(settings.calib ? 'calib' : settings.current, false);
+    if (key === 'muted') applyAudio();
     if (key === 'text' && settings.current === 'text' && !settings.calib) {
       clearTimeout(textTimer);
       textTimer = setTimeout(() => show('text'), 400);
@@ -169,6 +212,18 @@ const app = {
       const kind = kindOf(file);
       if (!kind) { ui.toast(`不支持的文件：${file.name}`); continue; }
       const draft = { kind, name: file.name.replace(/\.[^.]+$/, ''), blob: file };
+      if (kind === 'audio') { // 背景音乐只留一首，新的顶掉旧的
+        try {
+          const player = await audioPlayer(file);
+          const it = await addItem(draft);
+          unsaved ||= !it.persisted;
+          await setMusic(it, player);
+          ui.toast(`已设为背景音乐：${draft.name}`);
+        } catch (e) {
+          ui.toast(`${file.name}：${e.message || e}`);
+        }
+        continue;
+      }
       try {
         disposeScene(await itemScene(draft)); // 先试着载入一次，确认文件能用再保存
       } catch (e) {
@@ -184,6 +239,15 @@ const app = {
     if (last) show(`item:${last.id}`);
     if (unsaved) ui.toast('已导入，但无法保存到本机（隐私模式或空间不足），刷新后需要重新导入');
   },
+  music: () => music?.item.name ?? null,
+  async removeMusic() {
+    if (!music) return;
+    const old = music;
+    music = null;
+    old.player?.dispose();
+    await deleteItem(old.item.id);
+    ui.refresh();
+  },
   async remove(id) {
     const it = items.find((i) => `item:${i.id}` === id);
     if (!it) return;
@@ -192,7 +256,7 @@ const app = {
     delete settings.playlist[id];
     save();
     const gone = !entries().some((e) => e.id === settings.current);
-    if (gone) show('heart');
+    if (gone) show(FALLBACK);
     else if (settings.current === 'album') show('album'); // 相册内容变了，重建
     else ui.refresh();
   },
@@ -233,8 +297,21 @@ function frame(time) {
 }
 
 quad.fade = 0;
-items = await listItems();
-if (!entries().some((e) => e.id === settings.current)) settings.current = 'heart';
+const stored = await listItems();
+items = stored.filter((it) => it.kind !== 'audio');
+// 音乐在后台载入，不拖慢首屏；载入失败也留着名字，方便用户删掉
+for (const it of stored.filter((s) => s.kind === 'audio')) {
+  await setMusic(it, null);
+}
+if (music) {
+  const mine = music;
+  audioPlayer(mine.item.blob).then((player) => {
+    if (music !== mine) return player.dispose();
+    mine.player = player;
+    applyAudio();
+  }, () => {});
+}
+if (!entries().some((e) => e.id === settings.current)) settings.current = FALLBACK;
 show(settings.current);
 requestAnimationFrame(frame);
 
